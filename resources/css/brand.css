@@ -1,0 +1,31 @@
+:root {
+    --color-primary: #2563EB;   /* Bright Indigo Blue */
+    --color-accent: #06B6D4;    /* Cyan / Teal */
+    --color-dark: #1E293B;      /* Slate */
+    --color-light: #F8FAFC;     /* Light Gray Background */
+    --color-success: #16A34A;   /* Green */
+    --color-warning: #F59E0B;   /* Amber */
+    --color-danger: #DC2626;    /* Red */
+  }
+  
+  /* Branding examples */
+  .bg-primary   { background-color: var(--color-primary) !important; }
+  .bg-accent    { background-color: var(--color-accent) !important; }
+  .bg-dark      { background-color: var(--color-dark) !important; }
+  .bg-light     { background-color: var(--color-light) !important; }
+  
+  .text-primary { color: var(--color-primary) !important; }
+  .text-accent  { color: var(--color-accent) !important; }
+  .text-dark    { color: var(--color-dark) !important; }
+  .text-light   { color: var(--color-light) !important; }
+  
+  .btn-primary {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+  }
+  
+  .btn-primary:hover {
+    background-color: #1E40AF; /* darker shade of primary */
+    border-color: #1E40AF;
+  }
+  

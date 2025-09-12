@@ -1,0 +1,254 @@
+/* PricingPlans.css */
+.plan-selection-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    padding: 20px;
+  }
+  
+  .plan-selection-modal {
+    background: white;
+    border-radius: 16px;
+    padding: 30px;
+    width: 100%;
+    max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+    position: relative;
+  }
+  
+  .modal-header {
+    text-align: center;
+    margin-bottom: 30px;
+    position: relative;
+  }
+  
+  .modal-header h2 {
+    margin: 0 0 10px 0;
+    color: #2d3748;
+    font-size: 28px;
+    font-weight: 700;
+  }
+  
+  .modal-header p {
+    margin: 0;
+    color: #718096;
+    font-size: 16px;
+  }
+  
+  .close-btn {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    background: #f7fafc;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    font-size: 24px;
+    cursor: pointer;
+    color: #718096;
+    transition: all 0.3s ease;
+  }
+  
+  .close-btn:hover {
+    background: #edf2f7;
+    color: #2d3748;
+  }
+  
+  .plans-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+    margin-bottom: 30px;
+  }
+  
+  .plan-card {
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 30px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    background: white;
+  }
+  
+  .plan-card:hover {
+    border-color: #4299e1;
+    transform: translateY(-4px);
+    box-shadow: 0 10px 30px rgba(66, 153, 225, 0.15);
+  }
+  
+  .plan-card.selected {
+    border-color: #4299e1;
+    background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+    transform: scale(1.02);
+  }
+  
+  .plan-card.popular {
+    border-color: #4299e1;
+    background: linear-gradient(135deg, #ebf4ff 0%, #d6e6ff 100%);
+  }
+  
+  .popular-badge {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #4299e1;
+    color: white;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  
+  .savings-badge {
+    background: #48bb78;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 15px;
+    display: inline-block;
+  }
+  
+  .plan-card h3 {
+    margin: 10px 0 20px 0;
+    color: #2d3748;
+    font-size: 20px;
+    font-weight: 600;
+  }
+  
+  .price-container {
+    margin-bottom: 25px;
+  }
+  
+  .price {
+    display: block;
+    font-size: 36px;
+    font-weight: 800;
+    color: #2d3748;
+    line-height: 1;
+    margin-bottom: 5px;
+  }
+  
+  .interval {
+    color: #718096;
+    font-size: 14px;
+    font-weight: 500;
+  }
+  
+  .features {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    text-align: left;
+  }
+  
+  .features li {
+    padding: 8px 0;
+    color: #4a5568;
+    border-bottom: 1px solid #edf2f7;
+    font-size: 14px;
+  }
+  
+  .features li:last-child {
+    border-bottom: none;
+  }
+  
+  .modal-footer {
+    text-align: center;
+  }
+  
+  .subscribe-btn {
+    background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+    color: white;
+    padding: 16px 32px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-right: 12px;
+    transition: all 0.3s ease;
+    min-width: 200px;
+  }
+  
+  .subscribe-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #3182ce 0%, #2b6cb0 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(66, 153, 225, 0.4);
+  }
+  
+  .subscribe-btn:disabled {
+    background: #cbd5e0;
+    cursor: not-allowed;
+    transform: none;
+  }
+  
+  .cancel-btn {
+    background: transparent;
+    color: #718096;
+    padding: 16px 32px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  
+  .cancel-btn:hover {
+    background: #f7fafc;
+    color: #4a5568;
+  }
+  
+  /* Responsive design */
+  @media (min-width: 992px) {
+    .plans-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      margin-bottom: 30px;
+    }
+    
+  }
+  @media (max-width: 768px) {
+    .plan-selection-modal {
+      padding: 20px;
+      margin: 10px;
+    }
+    
+    .plans-grid {
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+    
+    .modal-footer {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    .subscribe-btn,
+    .cancel-btn {
+      width: 100%;
+      margin-right: 0;
+    }
+    
+    .price {
+      font-size: 28px;
+    }
+  }
