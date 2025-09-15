@@ -51,6 +51,15 @@ Route::middleware('auth:sanctum')->get('/usage/stats', function (Request $reques
   
 // ==================== PROTECTED ROUTES (AUTH ONLY) ====================
 Route::middleware('auth:sanctum')->group(function () {
+
+    Route::post('/subscription/downgrade', [PaymentController::class, 'downgradeSubscription']);
+    Route::post('/subscription/cancel', [PaymentController::class, 'cancelSubscription']);
+    
+    // Account deletion routes
+    Route::post('/account/delete/request', [AuthController::class, 'requestAccountDeletion']);
+    Route::post('/account/delete', [AuthController::class, 'deleteAccount']);
+
+
     // Organization routes (should be accessible without active subscription)
     Route::get('/current-organization', function (Request $request) {
         $user = $request->user();
@@ -192,6 +201,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CheckSubscription::class
 
     // AI routes
     Route::post('/ai/generate-proposal-text', [AiController::class, 'generateProposalText']);
+    Route::post('/ai/modify-proposal-text', [AiController::class, 'modifyProposalText']);
 
     // Simple me route
     Route::get('/me', function (Request $request) {

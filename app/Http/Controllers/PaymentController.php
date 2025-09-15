@@ -8,6 +8,9 @@ use App\Models\Organization;
 use App\Models\Subscription;
 use Stripe\Stripe;
 use Stripe\Checkout\Session as CheckoutSession;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use App\Services\PaymentService;
 
 class PaymentController extends Controller
 {
@@ -31,7 +34,7 @@ class PaymentController extends Controller
         return response()->json(['id' => $session->id]);
     }
 
-    public function subscribe(Request $request)
+    public function subscribeX(Request $request)
     {
         Stripe::setApiKey(config('services.stripe.secret'));
         
@@ -61,6 +64,34 @@ class PaymentController extends Controller
             'id' => $session->id,
             'url' => $session->url // Add this line
         ]);
+    }
+    public function subscribe(Request $request)
+    {
+        try {
+            $organization = $request->user()->organization;
+            
+            if (!$organization) {
+                return response()->json(['error' => 'User has no organization'], 400);
+            }
+            
+            $priceId = $request->input('priceId');
+            
+            $paymentService = new PaymentService();
+            $result = $paymentService->createSubscription(
+                $request->user(), 
+                $priceId, 
+                $organization
+            );
+            
+            // Return the same structure as before for frontend compatibility
+            return response()->json([
+                'id' => $result['id'],
+                'url' => $result['url']
+            ]);
+    
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
     public function success(Proposal $proposal)
@@ -144,28 +175,227 @@ class PaymentController extends Controller
                 }
                 break;
     
+            // case 'customer.subscription.deleted':
+            //     // Handle subscription cancellations
+            //     $subscriptionId = $event->data->object->id;
+            //     $subscription = Subscription::where('stripe_id', $subscriptionId)->first();
+                
+            //     if ($subscription) {
+            //         $subscription->update([
+            //             'stripe_status' => 'canceled',
+            //             'ends_at' => now()
+            //         ]);
+                    
+            //         $organization = $subscription->organization;
+            //         if ($organization) {
+            //             $organization->update(['subscription_status' => 'canceled']);
+            //         }
+            //     }
+            //     break;
+
             case 'customer.subscription.deleted':
                 // Handle subscription cancellations
                 $subscriptionId = $event->data->object->id;
                 $subscription = Subscription::where('stripe_id', $subscriptionId)->first();
                 
                 if ($subscription) {
+                    $organization = $subscription->organization;
+                    
+                    // Only update if this is the default subscription
+                    if ($subscription->type === 'default') {
+                        $subscription->update([
+                            'stripe_status' => 'canceled',
+                            'ends_at' => now()
+                        ]);
+                        
+                        if ($organization) {
+                            // Downgrade to free plan
+                            $organization->update([
+                                'subscription_type' => 'free',
+                                'subscription_status' => 'active'
+                            ]);
+                        }
+                    }
+                }
+                break;
+
+            case 'customer.subscription.updated':
+                $stripeSubscription = $event->data->object;
+                $subscription = Subscription::where('stripe_id', $stripeSubscription->id)->first();
+                
+                if ($subscription && $stripeSubscription->cancel_at_period_end) {
+                    // Subscription is scheduled to cancel at period end
                     $subscription->update([
-                        'stripe_status' => 'canceled',
-                        'ends_at' => now()
+                        'stripe_status' => 'pending_cancelation',
+                        'ends_at' => now()->setTimestamp($stripeSubscription->current_period_end)
                     ]);
                     
                     $organization = $subscription->organization;
                     if ($organization) {
-                        $organization->update(['subscription_status' => 'canceled']);
+                        $organization->update([
+                            'subscription_status' => 'pending_cancellation'
+                        ]);
                     }
                 }
                 break;
+                
         }
     
         return response()->json(['status' => 'success']);
     }
     
+    public function handlexxx(Request $request, $provider = null)
+    {
+        // Get provider from route parameter or request
+        $provider = $provider ?? $request->input('provider') ?? session('current_payment_provider') ?? 'stripe';
+        
+        try {
+            switch ($provider) {
+                case 'stripe':
+                    return $this->handleStripeWebhook($request);
+                case 'flutterwave':
+                    return $this->handleFlutterwaveWebhook($request);
+                default:
+                    return response()->json(['error' => 'Unsupported payment provider'], 400);
+            }
+        } catch (\Exception $e) {
+            Log::error("Webhook error for {$provider}: " . $e->getMessage());
+            return response()->json(['error' => 'Webhook processing failed'], 500);
+        }
+    }
+    
+    protected function handleStripeWebhook(Request $request)
+    {
+        $payload = $request->getContent();
+        $sigHeader = $request->header('Stripe-Signature');
+        $endpointSecret = config('services.stripe.webhook_secret');
+    
+        try {
+            $event = \Stripe\Webhook::constructEvent($payload, $sigHeader, $endpointSecret);
+        } catch (\Exception $e) {
+            Log::error('Stripe webhook validation error: ' . $e->getMessage());
+            return response()->json(['error' => 'Webhook error'], 400);
+        }
+    
+        // Add your existing Stripe webhook handling logic here
+        switch ($event->type) {
+            case 'checkout.session.completed':
+                // Handle session completed
+                $session = $event->data->object;
+                if ($session->mode === 'subscription') {
+                    $this->handleStripeSubscription($session);
+                }
+                break;
+                
+            case 'invoice.payment_succeeded':
+                // Handle successful payment
+                $invoice = $event->data->object;
+                $this->handleStripeInvoice($invoice);
+                break;
+                
+            // Add other event types as needed
+        }
+    
+        return response()->json(['status' => 'success']);
+    }
+
+    protected function handleStripeSubscription($session)
+    {
+        // Handle Stripe subscription creation
+        $organizationId = $session->client_reference_id;
+        $subscriptionId = $session->subscription;
+        
+        $organization = Organization::find($organizationId);
+        if ($organization) {
+            $subscription = $organization->subscriptions()
+                ->where('type', 'default')
+                ->first();
+                
+            if ($subscription) {
+                $subscription->update([
+                    'stripe_id' => $subscriptionId,
+                    'stripe_status' => 'active',
+                    'ends_at' => null
+                ]);
+            }
+            
+            $organization->update([
+                'subscription_status' => 'active'
+            ]);
+        }
+    }
+
+    protected function handleStripeInvoice($invoice)
+    {
+        // Handle Stripe invoice payment
+        $subscriptionId = $invoice->subscription;
+        $subscription = Subscription::where('stripe_id', $subscriptionId)->first();
+        
+        if ($subscription) {
+            $organization = $subscription->organization;
+            if ($organization) {
+                $organization->update(['subscription_status' => 'active']);
+                $subscription->update(['stripe_status' => 'active', 'ends_at' => null]);
+            }
+        }
+    }
+
+    protected function handleFlutterwaveWebhook(Request $request)
+    {
+        $payload = $request->all();
+        $secretHash = config('services.flutterwave.secret_hash');
+        
+        // Verify webhook signature if secret hash is set
+        if (!empty($secretHash) && isset($payload['secret_hash']) && $payload['secret_hash'] !== $secretHash) {
+            Log::error('Flutterwave webhook invalid secret hash');
+            return response()->json(['error' => 'Invalid secret hash'], 400);
+        }
+    
+        $event = $payload['event'] ?? '';
+        $data = $payload['data'] ?? [];
+    
+        Log::info("Flutterwave webhook received: {$event}", $data);
+    
+        switch ($event) {
+            case 'charge.completed':
+                $this->processFlutterwavePayment($data);
+                break;
+                
+            case 'subscription.created':
+                $this->processFlutterwaveSubscription($data);
+                break;
+                
+            default:
+                Log::info("Unhandled Flutterwave event: {$event}");
+        }
+    
+        return response()->json(['status' => 'success']);
+    }
+    
+    // Add these helper methods
+    protected function processFlutterwavePayment(array $data)
+    {
+        // Handle successful payment
+        $txRef = $data['tx_ref'] ?? '';
+        $amount = $data['amount'] ?? 0;
+        $status = $data['status'] ?? '';
+        
+        Log::info("Processing Flutterwave payment: {$txRef}, Amount: {$amount}, Status: {$status}");
+        
+        // Add your payment processing logic here
+    }
+    
+    protected function processFlutterwaveSubscription(array $data)
+    {
+        // Handle subscription creation
+        $planId = $data['plan'] ?? '';
+        $customerEmail = $data['customer']['email'] ?? '';
+        
+        Log::info("Processing Flutterwave subscription: Plan: {$planId}, Email: {$customerEmail}");
+        
+        // Add your subscription processing logic here
+    }
+
     public function subscriptionSuccess(Request $request)
     {
         $sessionId = $request->get('session_id');
@@ -184,4 +414,148 @@ class PaymentController extends Controller
     {
         return view('payments.cancel');
     }
+
+    public function downgradeSubscription(Request $request)
+    {
+        $user = $request->user();
+        $organization = $user->organization;
+        
+        if (!$organization) {
+            return response()->json(['error' => 'Organization not found'], 404);
+        }
+        
+        // Check if user is on a paid plan
+        if ($organization->subscription_type === 'free') {
+            return response()->json(['error' => 'Already on free plan'], 400);
+        }
+        
+        try {
+            Stripe::setApiKey(config('services.stripe.secret'));
+            
+            // Get current subscription
+            $subscription = $organization->subscriptions()
+                ->where('type', 'default')
+                ->where('stripe_status', 'active')
+                ->first();
+
+            // Log::info('Retrieving Stripe subscription: ' . $subscription->stripe_id);
+
+            if ($subscription && Str::startsWith($subscription->stripe_id, 'sub_')) {
+                // This is a real Stripe subscription
+                $stripeSubscription = \Stripe\Subscription::retrieve($subscription->stripe_id);
+                $stripeSubscription->cancel_at_period_end = true;
+                $stripeSubscription->save();
+
+                $subscription->update([
+                    'stripe_status' => 'pending_cancellation',
+                    'ends_at' => now()->setTimestamp($stripeSubscription->current_period_end)
+                ]);
+            
+                $organization->update([
+                    'subscription_status' => 'pending_cancellation',
+                    // keep subscription_type as paid until Stripe confirms cancellation
+                ]);
+            
+                return response()->json([
+                    'message' => 'Subscription will downgrade to free at the end of the billing period',
+                    'downgrade_date' => now()->setTimestamp($stripeSubscription->current_period_end)
+                ]);
+            } else {
+                // Not a real Stripe sub → downgrade immediately
+                $organization->update([
+                    'subscription_type' => 'free',
+                    'subscription_status' => 'active'
+                ]);
+            
+                if ($subscription) {
+                    $subscription->update([
+                        'stripe_status' => 'canceled',
+                        'ends_at' => now(),
+                        'stripe_price' => 'free',
+                        // 'stripe_id' => null // clear fake id
+                    ]);
+                }
+
+                return response()->json(['message' => 'Successfully downgraded to free plan']);
+            }            
+            
+            // If no Stripe subscription found, just downgrade immediately
+            $organization->update([
+                'subscription_type' => 'free',
+                'subscription_status' => 'active'
+            ]);
+            
+            if ($subscription) {
+                $subscription->update([
+                    'stripe_status' => 'canceled',
+                    'ends_at' => now(),
+                    'stripe_price' => 'free'
+                ]);
+            }
+            
+            return response()->json(['message' => 'Successfully downgraded to free plan']);
+            
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Failed to downgrade subscription: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // Add this method to handle immediate cancellation
+    public function cancelSubscription(Request $request)
+    {
+        $user = $request->user();
+        $organization = $user->organization;
+        
+        if (!$organization) {
+            return response()->json(['error' => 'Organization not found'], 404);
+        }
+        
+        try {
+            Stripe::setApiKey(config('services.stripe.secret'));
+            
+            $subscription = $organization->subscriptions()
+                ->where('type', 'default')
+                ->where('stripe_status', 'active')
+                ->first();
+            
+            if ($subscription && Str::startsWith($subscription->stripe_id, 'sub_')) {
+                // Real Stripe subscription → cancel at Stripe
+                $stripeSubscription = \Stripe\Subscription::retrieve($subscription->stripe_id);
+                $stripeSubscription->cancel();
+                
+                // Update local records
+                $subscription->update([
+                    'stripe_status' => 'canceled',
+                    'ends_at' => now(),
+                ]);
+                
+                $organization->update([
+                    'subscription_type' => 'free',
+                    'subscription_status' => 'active'
+                ]);
+                
+                return response()->json(['message' => 'Subscription canceled successfully']);
+            } else {
+                // Fake/free subscription → cancel locally only
+                if ($subscription) {
+                    $subscription->update([
+                        'stripe_status' => 'canceled',
+                        'ends_at' => now(),
+                        'stripe_price' => 'free',
+                    ]);
+                }
+    
+                $organization->update([
+                    'subscription_type' => 'free',
+                    'subscription_status' => 'active'
+                ]);
+                
+                return response()->json(['message' => 'Subscription downgraded to free (no Stripe subscription)']);
+            }
+            
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Failed to cancel subscription: ' . $e->getMessage()], 500);
+        }
+    }
+    
 }

@@ -12,6 +12,11 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+
+use Stripe\Stripe;
+use Stripe\Checkout\Session as CheckoutSession;
 
 class AuthController extends Controller
 {
@@ -227,6 +232,99 @@ class AuthController extends Controller
         ]);
 
         return response()->json(['message' => 'Password updated successfully']);
+    }
+
+    // Add this method to AuthController
+    public function deleteAccount(Request $request)
+    {
+        $user = $request->user();
+        
+        // Validate the request
+        $request->validate([
+            'confirmation' => 'required|in:DELETE MY ACCOUNT'
+        ]);
+
+        try {
+            DB::beginTransaction();
+            // Get organization
+            $organization = $user->organization;
+            
+            if ($organization) {
+
+                $subscription = $organization->subscriptions()
+                    ->where('type', 'default')
+                    ->whereIn('stripe_status', ['active', 'trialing'])
+                    ->first();
+
+                if ($subscription) {
+                    try {
+                        if (Str::startsWith($subscription->stripe_id, 'sub_')) {
+                            Stripe::setApiKey(config('services.stripe.secret'));
+                            $stripeSubscription = \Stripe\Subscription::retrieve($subscription->stripe_id);
+                            $stripeSubscription->cancel();
+
+                        } else {
+                            $subscription->update([
+                                'stripe_status' => 'canceled',
+                                'ends_at' => now(),
+                                'stripe_price' => 'free',
+                            ]);
+                        }
+                    } catch (\Exception $e) {
+                        Log::error("Failed to cancel subscription {$subscription->id} during account deletion: {$e->getMessage()}");
+                    }
+                    
+                } 
+
+                try {
+                    // Soft delete related data (adjust based on your model relationships)
+                    $organization->proposals()->delete();
+                    $organization->clients()->delete();
+                    $user->templates()->delete();
+                    $organization->subscriptions()->delete();
+                    
+                    // Delete organization
+                    $organization->delete();
+                } catch (\Exception $e) {
+                    Log::info($e->getMessage());
+                }
+            }
+            
+            // Delete user's personal data
+            $user->tokens()->delete();
+
+            if (in_array('Illuminate\Database\Eloquent\SoftDeletes', class_uses($user))) {
+                $user->delete();
+            } else {
+                $user->forceDelete();
+            }
+            
+            DB::commit();
+            
+            return response()->json([
+                'message' => 'Account and all associated data have been permanently deleted'
+            ]);
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'error' => 'Failed to delete account: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // Add this method for account deletion confirmation
+    public function requestAccountDeletion(Request $request)
+    {
+        $user = $request->user();
+        
+        // You might want to send an email confirmation here
+        // or perform additional checks before allowing deletion
+        
+        return response()->json([
+            'message' => 'Please confirm account deletion',
+            'confirmation_required' => 'DELETE MY ACCOUNT'
+        ]);
     }
 
     public function uploadLogo(Request $request)

@@ -50,9 +50,9 @@ export default function PayForProposalButton({ proposalId, subscription }) {
         console.error("No Stripe price ID found for plan:", planId);
         return;
       }
-
+  
       const res = await api.post('/organization/subscribe', {
-        priceId: plan.stripePriceId
+        priceId: plan.stripePriceId  // ← This stays the same!
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -67,7 +67,7 @@ export default function PayForProposalButton({ proposalId, subscription }) {
       setLoading(false);
     }
   }
-
+  
   async function handleOneTimePayment() {
     try {
       const token = localStorage.getItem('authToken');
