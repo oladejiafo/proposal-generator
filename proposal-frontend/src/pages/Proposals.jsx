@@ -6,7 +6,7 @@ import {
   generatePdf,
   api
 } from '../api';
-
+import { API_BASE } from "../api";
 import ProposalForm from '../components/ProposalForm';
 import UsageLimitAlert from '../components/UsageLimitAlert';
 
@@ -199,13 +199,13 @@ export default function Proposals() {
                             if (!token) throw new Error('No auth token found');
 
                             const res = await fetch(
-                              `http://localhost:8000/api/proposals/${proposal.id}/send`,
+                              `${API_BASE}/proposals/${proposal.id}/send`,
                               {
-                                method: 'POST',
+                                method: "POST",
                                 headers: {
-                                  'Content-Type': 'application/json',
-                                  'Authorization': `Bearer ${token}`, // important!
-                                  'X-Organization-ID': orgId || '',
+                                  "Content-Type": "application/json",
+                                  "Authorization": `Bearer ${token}`, // important!
+                                  "X-Organization-ID": orgId || "",
                                 },
                               }
                             );
@@ -238,7 +238,7 @@ export default function Proposals() {
                                 if (!token) throw new Error('No auth token found');
 
                                 const res = await fetch(
-                                  `http://localhost:8000/api/proposals/${proposal.id}/send`,
+                                  `${API_BASE}/proposals/${proposal.id}/send`,
                                   {
                                     method: 'POST',
                                     headers: {

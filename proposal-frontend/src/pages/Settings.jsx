@@ -1,10 +1,18 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Container, Card, Form, Button, Alert, Row, Col, Spinner, Image } from 'react-bootstrap';
 import api from '../api';
+import { SANCTUM_BASE } from "../api"; //${API_BASE}
 import { AuthContext } from '../authContext';
 import { Navigate, useNavigate } from 'react-router-dom';
 import UsageLimitAlert from '../components/UsageLimitAlert';
 import TeamManagement from '../components/TeamManagement';
+
+import { FaChevronRight } from "react-icons/fa";
+import Terms from '../pages/Terms';
+import PrivacyPolicy from '../pages/PrivacyPolicy';
+import Support from '../pages/Support';
+import Tutorial from '../pages/Tutorial';
+import Share from '../pages/Share';
 
 export default function Settings() {
   const [userData, setUserData] = useState({
@@ -31,6 +39,42 @@ export default function Settings() {
   const { auth } = useContext(AuthContext);
   const [organization, setSubscription] = useState(auth?.organization || null);
   const navigate = useNavigate();
+  ///////
+  const [downgrading, setDowngrading] = useState(false);
+  const [canceling, setCanceling] = useState(false);
+
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  // Add legal options
+  const legalOptions = [
+    {
+      title: 'Terms of Service',
+      icon: 'file-text',
+      screen: 'Terms',
+    },
+    {
+      title: 'Privacy Policy',
+      icon: 'shield',
+      screen: 'PrivacyPolicy',
+    },
+    {
+      title: 'Support',
+      icon: 'question-circle',
+      screen: 'Support',
+    },
+    {
+      title: 'Tutorials',
+      icon: 'play-circle',
+      screen: 'Tutorial',
+    },
+    {
+      title: 'Share App',
+      icon: 'share',
+      screen: 'Share',
+    },
+  ];
 
   useEffect(() => {
     fetchUserData();
@@ -40,7 +84,7 @@ export default function Settings() {
     setLoading(true);
     try {
       const token = localStorage.getItem('authToken');
-    //   const res = await api.get('/user');
+      //   const res = await api.get('/user');
       const res = await api.get('/user', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -71,7 +115,7 @@ export default function Settings() {
     fetchUserData();
     fetchSubscription();
   }, []);
-  
+
   const fetchSubscription = async () => {
     try {
       const token = localStorage.getItem('authToken');
@@ -137,16 +181,16 @@ export default function Settings() {
     try {
       const token = localStorage.getItem('authToken');
       await api.delete('/user/logo', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data'
-          }
-        });
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
       setLogoPreview('');
       setUserData(prev => ({ ...prev, logo: null }));
       setSuccess('Logo removed successfully');
     } catch (err) {
-        console.log(err)
+      console.log(err)
       setError('Failed to remove logo');
     }
   };
@@ -160,11 +204,11 @@ export default function Settings() {
     try {
       const token = localStorage.getItem('authToken');
       await api.put('/user/profile', userData, {
-            headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            }
-       });
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
 
       setSuccess('Profile updated successfully');
     } catch (err) {
@@ -182,12 +226,12 @@ export default function Settings() {
     try {
 
       const token = localStorage.getItem('authToken');
-      await api.put('/user/password', passwordData,{
-            headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            }
-        });
+      await api.put('/user/password', passwordData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
       setSuccess('Password updated successfully');
       setPasswordData({
         current_password: '',
@@ -198,6 +242,96 @@ export default function Settings() {
       setError(err.response?.data?.message || 'Failed to update password');
     }
     setSaving(false);
+  };
+
+  const handleDowngrade = async () => {
+    if (!window.confirm('Are you sure you want to downgrade to the free plan? Your paid features will remain active until the end of your billing period.')) {
+      return;
+    }
+
+    setDowngrading(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await api.post('/subscription/downgrade', {}, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      console.log('Starting');
+      setSuccess(response.data.message);
+      if (response.data.downgrade_date) {
+        console.log('yesss');
+        setSuccess(`${response.data.message} on ${new Date(response.data.downgrade_date).toLocaleDateString()}`);
+      }
+
+      // Refresh subscription data
+      fetchSubscription();
+    } catch (err) {
+      console.log(err);
+      setError(err.response?.data?.error || 'Failed to downgrade subscription');
+    }
+    setDowngrading(false);
+  };
+
+  const handleCancelSubscription = async () => {
+    if (!window.confirm('Are you sure you want to cancel your subscription immediately? This action cannot be undone.')) {
+      return;
+    }
+
+    setCanceling(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await api.post('/subscription/cancel', {}, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        }
+      });
+
+      setSuccess(response.data.message);
+      fetchSubscription();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to cancel subscription');
+    }
+    setCanceling(false);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmation !== 'DELETE MY ACCOUNT') {
+      setError('Please type "DELETE MY ACCOUNT" to confirm');
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      await api.post('/account/delete', {
+        confirmation: deleteConfirmation
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        }
+      });
+
+      setSuccess('Your account has been permanently deleted');
+
+      // Clear local storage and redirect to home
+      localStorage.removeItem('authToken');
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 2000);
+
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to delete account');
+    }
+    setDeleting(false);
+    setShowDeleteModal(false);
+  };
+
+  // Add this function to handle legal option clicks
+  const handleLegalOptionClick = (screen) => {
+    navigate(`/${screen.toLowerCase()}`);
   };
 
   if (loading) {
@@ -226,15 +360,15 @@ export default function Settings() {
             </Card.Header>
             <Card.Body>
 
-             {/* Logo Upload Section */}
+              {/* Logo Upload Section */}
               <div className="text-center mb-4">
                 {logoPreview ? (
                   <>
-                    <Image 
-                    //   src={logoPreview} 
-                      src={`http://local.test:8000${logoPreview}`} 
-                      alt="Company Logo" 
-                      height="120" 
+                    <Image
+                      //   src={logoPreview} 
+                      src={`${SANCTUM_BASE}${logoPreview}`}
+                      alt="Company Logo"
+                      height="120"
                       className="rounded mb-3"
                       style={{ objectFit: 'cover' }}
                     />
@@ -255,7 +389,7 @@ export default function Settings() {
                     <p className="text-muted">No logo uploaded</p>
                   </div>
                 )}
-                
+
                 <Form.Group className="mt-3">
                   <Form.Label className="btn btn-outline-primary cursor-pointer">
                     <i className="fas fa-upload me-2"></i>
@@ -333,9 +467,9 @@ export default function Settings() {
                   />
                 </Form.Group>
 
-                <Button 
-                  type="submit" 
-                  variant="primary" 
+                <Button
+                  type="submit"
+                  variant="primary"
                   disabled={saving}
                 >
                   {saving ? 'Saving...' : 'Update Profile'}
@@ -343,17 +477,6 @@ export default function Settings() {
               </Form>
             </Card.Body>
           </Card>
-
-          {organization.subscription_type !== 'free' && (
-            <Card className="mt-4">
-              <Card.Header>
-                <h5>Team Members</h5>
-              </Card.Header>
-              <Card.Body>
-                <TeamManagement organization={organization} />
-              </Card.Body>
-            </Card>
-          )}
         </Col>
 
         <Col md={6}>
@@ -397,9 +520,9 @@ export default function Settings() {
                   />
                 </Form.Group>
 
-                <Button 
-                  type="submit" 
-                  variant="primary" 
+                <Button
+                  type="submit"
+                  variant="primary"
                   disabled={saving}
                 >
                   {saving ? 'Updating...' : 'Change Password'}
@@ -407,6 +530,52 @@ export default function Settings() {
               </Form>
             </Card.Body>
           </Card>
+
+          {/* Add Legal & Help Section */}
+          <Card className="mt-4">
+            <Card.Header>
+              <h5>Legal & Help</h5>
+            </Card.Header>
+            <Card.Body>
+              {legalOptions.map((option, index) => (
+                <div
+                  key={index}
+                  className="d-flex justify-content-between align-items-center p-3 border-bottom cursor-pointer"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => handleLegalOptionClick(option.screen)}
+                >
+                  <div className="d-flex align-items-center">
+                    <i className={`fas fa-${option.icon} me-3 text-primary`}></i>
+                    <span>{option.title}</span>
+                  </div>
+                  <FaChevronRight className="text-muted" />
+                </div>
+              ))}
+            </Card.Body>
+          </Card>
+
+        </Col>
+      </Row>
+
+      {organization.subscription_type !== 'free' && (
+        <Row>
+          <Col md={12}>
+
+            <Card className="mt-4">
+              <Card.Header>
+                <h5>Team Members</h5>
+              </Card.Header>
+              <Card.Body>
+                <TeamManagement organization={organization} />
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+
+      )}
+
+      <Row>
+        <Col md={12}>
 
           {/* Future: Subscription Management Card */}
           <Card className="mt-4">
@@ -430,33 +599,33 @@ export default function Settings() {
                   {organization.subscription_status !== "active" &&
                     organization.subscription_type === "free" && (
                       <Alert variant="warning">
-                        Your {organization.subscription_type} subscription is inactive. 
+                        Your {organization.subscription_type} subscription is inactive.
                         <br />
-                        <Button 
-                          variant="primary" 
+                        <Button
+                          variant="primary"
                           className="mt-2"
-                          onClick={() => navigate('/payment', { 
-                            state: { 
+                          onClick={() => navigate('/payment', {
+                            state: {
                               plan: organization.subscription_type,
-                              organization: organization 
+                              organization: organization
                             }
                           })}
                         >
                           Renew Subscription
                         </Button>
                       </Alert>
-                  )}
+                    )}
 
                   {organization.subscription_type === "free" && (
                     <Alert variant="info">
-                      You're on the Free plan. 
+                      You're on the Free plan.
                       <br />
-                      <Button className='mt-2' variant='primary' onClick={() => navigate('/payment', { 
-                          state: { 
-                            plan: organization.subscription_type,
-                            organization: organization 
-                          }
-                        })}
+                      <Button className='mt-2' variant='primary' onClick={() => navigate('/payment', {
+                        state: {
+                          plan: organization.subscription_type,
+                          organization: organization
+                        }
+                      })}
                       >
                         Upgrade Plan
                       </Button>
@@ -465,6 +634,36 @@ export default function Settings() {
                   )}
 
                   {organization && <UsageLimitAlert organization={organization} showDetails={true} />}
+
+                  {organization.subscription_type !== 'free' && organization.subscription_status === 'active' && (
+                    <div className="mt-3">
+                      <Button
+                        variant="outline-warning"
+                        onClick={handleDowngrade}
+                        disabled={downgrading}
+                        className="me-2"
+                      >
+                        {downgrading ? 'Processing...' : 'Downgrade to Free'}
+                      </Button>
+                      <Button
+                        variant="outline-danger"
+                        onClick={handleCancelSubscription}
+                        disabled={canceling}
+                      >
+                        {canceling ? 'Canceling...' : 'Cancel Immediately'}
+                      </Button>
+                      <p className="text-muted mt-2 small">
+                        Downgrading will keep your paid features until the end of your billing period.
+                      </p>
+                    </div>
+                  )}
+
+                  {organization.subscription_status === 'pending_cancellation' && (
+                    <Alert variant="info" className="mt-3">
+                      <strong>Pending Downgrade:</strong> Your subscription will be downgraded to free at the end of your billing period.
+                    </Alert>
+                  )}
+
                 </>
               )}
             </Card.Body>
@@ -472,6 +671,79 @@ export default function Settings() {
 
         </Col>
       </Row>
+      <Row>
+        <Col md={12}>
+          <Card className="mt-4 border-danger">
+            <Card.Header className="bg-danger text-white">
+              <h5>Danger Zone</h5>
+            </Card.Header>
+            <Card.Body>
+              <h6>Delete Account</h6>
+              <p className="text-muted">
+                Permanently delete your account and all associated data. This action cannot be undone.
+              </p>
+
+              <Button
+                variant="outline-danger"
+                onClick={() => setShowDeleteModal(true)}
+              >
+                Delete Account
+              </Button>
+            </Card.Body>
+          </Card>
+
+        </Col>
+      </Row>
+
+      {showDeleteModal && (
+        <div className="modal show d-block" tabIndex="-1">
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header bg-danger text-white">
+                <h5 className="modal-title">Confirm Account Deletion</h5>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  onClick={() => setShowDeleteModal(false)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <Alert variant="danger">
+                  <strong>Warning:</strong> This action is permanent and cannot be undone. All your data, including proposals, clients, and templates will be permanently deleted.
+                </Alert>
+
+                <Form.Group>
+                  <Form.Label>
+                    Type <code>DELETE MY ACCOUNT</code> to confirm:
+                  </Form.Label>
+                  <Form.Control
+                    type="text"
+                    value={deleteConfirmation}
+                    onChange={(e) => setDeleteConfirmation(e.target.value)}
+                    placeholder="DELETE MY ACCOUNT"
+                  />
+                </Form.Group>
+              </div>
+              <div className="modal-footer">
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowDeleteModal(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={handleDeleteAccount}
+                  disabled={deleting || deleteConfirmation !== 'DELETE MY ACCOUNT'}
+                >
+                  {deleting ? 'Deleting...' : 'Permanently Delete Account'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </Container>
   );
 }

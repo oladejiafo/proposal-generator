@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Container, Spinner, Alert, Button } from 'react-bootstrap';
+import { API_BASE } from "../api"; //${API_BASE}
 
 export default function ProposalView() {
   const { token } = useParams();
@@ -17,13 +18,13 @@ export default function ProposalView() {
 
   async function fetchProposal() {
     try {
-      const res = await fetch(`http://localhost:8000/api/proposal/view/${token}`);
+      const res = await fetch(`${API_BASE}/api/proposal/view/${token}`);
       if (!res.ok) throw new Error('Proposal not found');
       const data = await res.json();
       setProposal(data);
 
       // Mark view after loading
-      await fetch('http://localhost:8000/api/proposals/viewed', {
+      await fetch(`${API_BASE}/api/proposals/viewed`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: data.view_token }),

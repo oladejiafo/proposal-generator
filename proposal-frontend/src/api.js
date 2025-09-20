@@ -1,18 +1,45 @@
 import axios from 'axios';
 
-const api = axios.create({
-  baseURL: 'http://local.test:8000/api',
-  withCredentials: false,
-  headers: {
-    'X-Requested-With': 'XMLHttpRequest',
-    'Content-Type': 'application/json'
-    },
-});
+// Detect environment
+const isLocal = window.location.hostname === "local.test" || window.location.hostname === "localhost";
 
+// Base URLs
+export const API_BASE = isLocal
+  ? "http://local.test:8000/api"
+  : "https://g8pitch.g8brooks.com/api";
+
+export const SANCTUM_BASE = isLocal
+  ? "http://local.test:8000"
+  : "https://g8pitch.g8brooks.com";
+
+// API client
+const api = axios.create({
+    baseURL: API_BASE,
+    withCredentials: true,
+    headers: {
+      "X-Requested-With": "XMLHttpRequest",
+      "Content-Type": "application/json",
+    },
+  });
+
+// const api = axios.create({
+//   baseURL: 'http://local.test:8000/api',
+//   withCredentials: false,
+//   headers: {
+//     'X-Requested-With': 'XMLHttpRequest',
+//     'Content-Type': 'application/json'
+//     },
+// });
+
+// Sanctum client (no /api prefix)
 const sanctum = axios.create({
-  baseURL: 'http://local.test:8000', // no /api prefix here
-  withCredentials: false,
-});
+    baseURL: SANCTUM_BASE,
+    withCredentials: true,
+  });
+// const sanctum = axios.create({
+//   baseURL: 'http://local.test:8000', // no /api prefix here
+//   withCredentials: false,
+// });
 
 export const setAuthToken = (token) => {
   if (token) {

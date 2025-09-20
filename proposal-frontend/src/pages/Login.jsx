@@ -2,6 +2,7 @@ import React, { useState, useContext } from 'react';
 import { Form, Button, Container, Alert, Card } from 'react-bootstrap';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../api';
+import { API_BASE,SANCTUM_BASE } from "../api"; //${API_BASE}
 import axios from 'axios';
 import { AuthContext } from "../authContext";
 
@@ -19,7 +20,7 @@ export default function Login() {
     setLoading(true);
   
     try {
-      await axios.get('http://local.test:8000/sanctum/csrf-cookie', { withCredentials: true });
+      await axios.get(`${SANCTUM_BASE}/sanctum/csrf-cookie`, { withCredentials: true });
       const res = await api.post('/login', { email, password });
       
       // Check if we got a proper response

@@ -271,6 +271,139 @@ button:not(.btn-secondary):not(.btn-light):not(.btn-outline-):hover {
   border-color: var(--color-primary);
 }
 
+
+/* Add these to your existing CSS file */
+
+/* Bootstrap button overrides */
+.btn-primary {
+  background-color: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+  color: white !important;
+}
+
+.btn-primary:hover {
+  background-color: var(--color-accent) !important;
+  border-color: var(--color-accent) !important;
+  color: white !important;
+}
+
+.btn-outline-primary {
+  color: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+}
+
+.btn-outline-primary:hover {
+  background-color: var(--color-primary) !important;
+  color: white !important;
+}
+
+.btn-secondary {
+  background-color: var(--color-secondary) !important;
+  border-color: var(--color-secondary) !important;
+  color: var(--color-primary) !important;
+}
+
+.btn-secondary:hover {
+  background-color: var(--color-accent) !important;
+  border-color: var(--color-accent) !important;
+  color: white !important;
+}
+
+.btn-info {
+  background-color: var(--color-accent) !important;
+  border-color: var(--color-accent) !important;
+  color: white !important;
+}
+
+.btn-info:hover {
+  background-color: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+  color: white !important;
+}
+
+/* Text color overrides */
+.text-primary {
+  color: var(--color-primary) !important;
+}
+
+.text-secondary {
+  color: var(--color-secondary) !important;
+}
+
+.text-accent {
+  color: var(--color-accent) !important;
+}
+
+/* Background color overrides */
+.bg-primary {
+  background-color: var(--color-primary) !important;
+}
+
+.bg-secondary {
+  background-color: var(--color-secondary) !important;
+}
+
+.bg-accent {
+  background-color: var(--color-accent) !important;
+}
+
+.bg-light {
+  background-color: var(--color-light) !important;
+}
+
+/* Border color overrides */
+.border-primary {
+  border-color: var(--color-primary) !important;
+}
+
+.border-secondary {
+  border-color: var(--color-secondary) !important;
+}
+
+.border-accent {
+  border-color: var(--color-accent) !important;
+}
+
+/* Alert overrides */
+.alert-primary {
+  background-color: rgba(5, 68, 94, 0.1);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.alert-info {
+  background-color: rgba(24, 154, 180, 0.1);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* Badge overrides */
+.badge.bg-primary {
+  background-color: var(--color-primary) !important;
+}
+
+.badge.bg-secondary {
+  background-color: var(--color-secondary) !important;
+  color: var(--color-primary) !important;
+}
+
+.badge.bg-info {
+  background-color: var(--color-accent) !important;
+}
+
+/* Navbar overrides */
+.navbar.bg-primary {
+  background-color: var(--color-primary) !important;
+}
+
+.navbar-dark .navbar-nav .nav-link {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.navbar-dark .navbar-nav .nav-link:hover {
+  color: var(--color-secondary) !important;
+}
+
 /* Custom dropdown styles */
 .custom-user-dropdown .dropdown-toggle {
   color: white !important;
@@ -413,28 +546,5 @@ select {
   button {
     background-color: var(--color-primary);
     color: white;
-  }
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  body {
-    background-color: #0a2e3d;
-    color: #D4F1F4;
-  }
-  
-  .card {
-    background-color: #05445E;
-    color: #D4F1F4;
-  }
-  
-  .form-input {
-    background-color: #189AB4;
-    color: white;
-    border-color: #75E6DA;
-  }
-  
-  .form-input::placeholder {
-    color: rgba(255, 255, 255, 0.7);
   }
 }

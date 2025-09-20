@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import axios from 'axios';
+import { API_BASE } from "../api"; //${API_BASE}
 import './PricingPlans.css'; // We'll create this CSS file
 
 const stripePromise = loadStripe('pk_test_51S5MD4AWSxFynBRlniaMRWSYM8ubQImysnl0BDloWYJkde5ncdzIYVecKSZbIbZwASYIWi5lwF3AnpgBs7tHh3LN00nTzwfMjC');
@@ -32,7 +33,7 @@ export default function PayForProposalButton({ proposalId, subscription }) {
   const [loading, setLoading] = useState(false);
 
   const api = axios.create({
-    baseURL: 'http://local.test:8000/api',
+    baseURL: `${API_BASE}`,
     withCredentials: true,
     headers: {
       'X-Requested-With': 'XMLHttpRequest',

@@ -15,9 +15,20 @@ import ProposalPage from './pages/ProposalPage';
 import Payment from './pages/Payment';
 import { useParams } from 'react-router-dom';
 import ProtectedRoute from "./components/ProtectedRoute";
+import LandingPage from "./pages/LandingPage";
+import PricingPage from './pages/PricingPage';
+// import useIdleLogout from "./hooks/useIdleLogout";
+
+// Import the legal pages
+import Terms from './pages/Terms';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import Support from './pages/Support';
+import Tutorial from './pages/Tutorial';
+import Share from './pages/Share';
 
 function App() {
   const { auth, loading } = useContext(AuthContext);
+  // useIdleLogout(30 * 60 * 1000);
 
   if (loading) {
     return (
@@ -33,54 +44,81 @@ function App() {
     <Router>
       <Routes>
         {/* Public routes */}
-        <Route path="/login" element={!auth ? <Login /> : <Navigate to="/" replace />} />
-        <Route path="/register" element={!auth ? <Register /> : <Navigate to="/" replace />} />
-        <Route path="/proposal/view/:token" element={<ProposalView />} />
-        {/* <Route path="/payment" element={<Payment />} /> */}
-        
-        {/* Protected routes */}
-        <Route path="/" element={
-          auth ? <DashboardLayout /> : <Navigate to="/login" replace />
-        }>
-          <Route index element={
-            <ProtectedRoute>
-              <DashboardHome />
-            </ProtectedRoute>
-          } />
-          <Route path="clients" element={
-            <ProtectedRoute>
-              <Clients />
-            </ProtectedRoute>
-          } />
-          <Route path="proposals" element={
-            <ProtectedRoute>
-              <Proposals />
-            </ProtectedRoute>
-          } />
-          <Route path="templates" element={
-            <ProtectedRoute>
-              <Templates />
-            </ProtectedRoute>
-          } />
-          <Route path="settings" element={
-            <ProtectedRoute>
-              <Settings />
-            </ProtectedRoute>
-          } />
-          <Route path="proposals/:proposalId" element={
-            <ProtectedRoute>
-              <ProposalPageWrapper />
-            </ProtectedRoute>
-          } />
-          <Route path="payment" element={
-              <Payment />
-          } />
+        <Route
+          path="/"
+          element={auth ? <DashboardLayout /> : <LandingPage />}
+        >
+          {/* Dashboard only shows if authenticated */}
+          {auth && (
+            <>
+              <Route index element={
+                <ProtectedRoute>
+                  <DashboardHome />
+                </ProtectedRoute>
+              } />
+              <Route path="clients" element={
+                <ProtectedRoute>
+                  <Clients />
+                </ProtectedRoute>
+              } />
+              <Route path="proposals" element={
+                <ProtectedRoute>
+                  <Proposals />
+                </ProtectedRoute>
+              } />
+              <Route path="templates" element={
+                <ProtectedRoute>
+                  <Templates />
+                </ProtectedRoute>
+              } />
+              <Route path="settings" element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              } />
+              <Route path="proposals/:proposalId" element={
+                <ProtectedRoute>
+                  <ProposalPageWrapper />
+                </ProtectedRoute>
+              } />
+              <Route path="payment" element={<Payment />} />
+
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/privacypolicy" element={<PrivacyPolicy />} />
+              <Route path="/support" element={<Support />} />
+              <Route path="/tutorial" element={<Tutorial />} />
+              <Route path="/share" element={<Share />} />
+
+            </>
+          )}
         </Route>
-        
-        {/* Catch all route */}
-        <Route path="*" element={<Navigate to={auth ? "/" : "/login"} replace />} />
+
+        <Route
+          path="/login"
+          element={!auth ? <Login /> : <Navigate to="/" replace />}
+        />
+        <Route
+          path="/register"
+          element={!auth ? <Register /> : <Navigate to="/" replace />}
+        />
+        <Route path="/pricing" element={<PricingPage />} />
+
+        {/* <Route path="/terms" element={<Terms />} />
+        <Route path="/privacypolicy" element={<PrivacyPolicy />} />
+        <Route path="/support" element={<Support />} />
+        <Route path="/tutorial" element={<Tutorial />} />
+        <Route path="/share" element={<Share />} />
+         */}
+        <Route path="/proposal/view/:token" element={<ProposalView />} />
+
+        {/* Catch all */}
+        <Route
+          path="*"
+          element={<Navigate to={auth ? "/" : "/login"} replace />}
+        />
       </Routes>
     </Router>
+
   );
 }
 

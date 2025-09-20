@@ -1,9 +1,11 @@
 import React, { useState, useContext } from 'react';
 import { Form, Button, Container, Alert, Card, Modal } from 'react-bootstrap';
 import axios from 'axios';
+import { SANCTUM_BASE, API_BASE } from "../api"; //${API_BASE}
 import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from "../authContext";
 import RegistrationPlans from "../components/RegistrationPlans";
+import PricingPage from './PricingPage';
 
 export default function Register() {
   const { setAuth } = useContext(AuthContext);
@@ -16,13 +18,18 @@ export default function Register() {
     plan: 'free' // Default to free plan
   });
   const [error, setError] = useState('');
-  const [showPlanModal, setShowPlanModal] = useState(true); // Show plan selection first
+  const [showPlanModal, setShowPlanModal] = useState(true); //showPlanModal, Show plan selection first
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
+
+  // const handlePlanSelect = (planId) => {
+  //   setForm({ ...form, plan: planId });
+  //   setShowPlanModal(false);
+  // };
 
   const handlePlanSelect = (planId) => {
     setForm({ ...form, plan: planId });
@@ -35,11 +42,19 @@ export default function Register() {
     setLoading(true);
     
     try {
-      await axios.get('http://local.test:8000/sanctum/csrf-cookie', {
+      // await axios.get('https://g8pitch.g8brooks.com/sanctum/csrf-cookie', {
+      //   withCredentials: true,
+      // });
+
+      // const res = await axios.post('https://g8pitch.g8brooks.com/api/register', form, {
+      //   withCredentials: true,
+      // });
+
+      await axios.get(`${SANCTUM_BASE}/sanctum/csrf-cookie`, {
         withCredentials: true,
       });
-
-      const res = await axios.post('http://local.test:8000/api/register', form, {
+      
+      const res = await axios.post(`${API_BASE}/register`, form, {
         withCredentials: true,
       });
 
@@ -69,7 +84,7 @@ export default function Register() {
   if (showPlanModal) {
     return (
       <Container className="d-flex align-items-center justify-content-center min-vh-100">
-        <RegistrationPlans onPlanSelect={handlePlanSelect} loading={loading} />
+        <PricingPage onPlanSelect={handlePlanSelect} loading={loading} />
       </Container>
     );
   }
@@ -82,7 +97,7 @@ export default function Register() {
             <Button variant="outline-secondary" size="sm" onClick={handleBackToPlans} className="me-2">
               ← Back
             </Button>
-            <h3 className="mb-0 fw-bold">Complete Registration</h3>
+            <h4 className="mb-0 fw-bold">Complete Registration</h4>
           </div>
           
           <div className="plan-badge mb-3">

@@ -205,7 +205,7 @@ export default function PricingPage({ onPlanSelect, loading }) {
       </Container>
 
       {/* Footer */}
-      <footer className="mt-auto py-4 border-top bg-white">
+      <footer className="mt-auto py-4 border-top">
         <Container className="text-center">
         <small className="text-muted">
             © {new Date().getFullYear()} G8Pitch · Built with ❤️ by{" "}

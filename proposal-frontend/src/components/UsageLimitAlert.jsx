@@ -84,7 +84,7 @@ export default function UsageLimitAlert({
             </span>
             <ProgressBar 
             now={currentLimit.percentage} 
-            variant="success" 
+            variant="accent" 
             style={{width: '100px', height: '8px'}} 
             />
         </div>
@@ -128,7 +128,7 @@ export default function UsageLimitAlert({
                 </div>
                 <ProgressBar 
                 now={proposals.percentage} 
-                variant={isNearLimit ? 'warning' : 'success'}
+                variant={isNearLimit ? 'warning' : 'primary'}
                 className="mb-2"
                 />
             </div>
@@ -141,7 +141,7 @@ export default function UsageLimitAlert({
                 </div>
                 <ProgressBar 
                 now={(templates.used / templates.limit) * 100} 
-                variant="info"
+                variant="accent"
                 className="mb-2"
                 />
             </div>
@@ -154,7 +154,7 @@ export default function UsageLimitAlert({
                 </div>
                 <ProgressBar 
                 now={(clients.used / clients.limit) * 100} 
-                variant="info"
+                variant="secondary"
                 />
             </div>
 
