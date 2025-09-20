@@ -18,8 +18,11 @@ class PaymentController extends Controller
     {
         Stripe::setApiKey(config('services.stripe.secret'));
 
-        $successUrl = route('payment.success', ['proposal' => $proposal->id]);
-        $cancelUrl  = route('payment.cancel', ['proposal' => $proposal->id]);
+        $successUrl = route('subscription.success') . '?session_id={CHECKOUT_SESSION_ID}';
+        $cancelUrl  = route('subscription.cancel');
+
+        // $successUrl = route('payment.success', ['proposal' => $proposal->id]);
+        // $cancelUrl  = route('payment.cancel', ['proposal' => $proposal->id]);
         $priceId = $request->input('priceId');
         $session = CheckoutSession::create([
             'line_items' => [[
@@ -108,7 +111,7 @@ class PaymentController extends Controller
         return view('payments.cancel', compact('proposal'));
     }
 
-    public function handle(Request $request)
+    public function handleXX(Request $request)
     {
         $payload = $request->getContent();
         $sigHeader = $request->header('Stripe-Signature');
@@ -174,24 +177,6 @@ class PaymentController extends Controller
                     }
                 }
                 break;
-    
-            // case 'customer.subscription.deleted':
-            //     // Handle subscription cancellations
-            //     $subscriptionId = $event->data->object->id;
-            //     $subscription = Subscription::where('stripe_id', $subscriptionId)->first();
-                
-            //     if ($subscription) {
-            //         $subscription->update([
-            //             'stripe_status' => 'canceled',
-            //             'ends_at' => now()
-            //         ]);
-                    
-            //         $organization = $subscription->organization;
-            //         if ($organization) {
-            //             $organization->update(['subscription_status' => 'canceled']);
-            //         }
-            //     }
-            //     break;
 
             case 'customer.subscription.deleted':
                 // Handle subscription cancellations
@@ -243,27 +228,202 @@ class PaymentController extends Controller
     
         return response()->json(['status' => 'success']);
     }
-    
-    public function handlexxx(Request $request, $provider = null)
+
+    public function handle(Request $request)
     {
-        // Get provider from route parameter or request
-        $provider = $provider ?? $request->input('provider') ?? session('current_payment_provider') ?? 'stripe';
-        
+        $payload = $request->getContent();
+        $sigHeader = $request->header('Stripe-Signature');
+        $endpointSecret = config('services.stripe.webhook_secret');
+    
         try {
-            switch ($provider) {
-                case 'stripe':
-                    return $this->handleStripeWebhook($request);
-                case 'flutterwave':
-                    return $this->handleFlutterwaveWebhook($request);
-                default:
-                    return response()->json(['error' => 'Unsupported payment provider'], 400);
+            $event = \Stripe\Webhook::constructEvent($payload, $sigHeader, $endpointSecret);
+        } catch (\Exception $e) {
+            Log::error('Stripe webhook validation error: ' . $e->getMessage());
+            return response()->json(['error' => 'Webhook error'], 400);
+        }
+    
+        Log::info('Stripe webhook received: ' . $event->type);
+    
+        try {
+            switch ($event->type) {
+                case 'checkout.session.completed':
+                    $this->handleCheckoutSessionCompleted($event->data->object);
+                    break;
+    
+                case 'invoice.payment_succeeded':
+                    $this->handleInvoicePaymentSucceeded($event->data->object);
+                    break;
+    
+                case 'customer.subscription.deleted':
+                    $this->handleSubscriptionDeleted($event->data->object);
+                    break;
+    
+                case 'customer.subscription.updated':
+                    $this->handleSubscriptionUpdated($event->data->object);
+                    break;
             }
         } catch (\Exception $e) {
-            Log::error("Webhook error for {$provider}: " . $e->getMessage());
-            return response()->json(['error' => 'Webhook processing failed'], 500);
+            Log::error('Webhook processing error: ' . $e->getMessage());
+            return response()->json(['error' => 'Processing failed'], 500);
+        }
+    
+        return response()->json(['status' => 'success']);
+    }
+    
+    protected function handleCheckoutSessionCompleted($session)
+    {
+        Log::info('Processing checkout.session.completed', ['session_id' => $session->id, 'mode' => $session->mode]);
+    
+        if ($session->mode === 'subscription') {
+            $this->handleSubscriptionCheckout($session);
+        } else if ($session->mode === 'payment') {
+            $this->handleOneTimePayment($session);
         }
     }
     
+    protected function handleSubscriptionCheckout($session)
+    {
+        $organizationId = $session->metadata->organization_id ?? $session->client_reference_id;
+        
+        if (!$organizationId) {
+            Log::error('No organization ID found in session', ['session_id' => $session->id]);
+            return;
+        }
+    
+        $organization = Organization::find($organizationId);
+        if (!$organization) {
+            Log::error('Organization not found', ['organization_id' => $organizationId]);
+            return;
+        }
+    
+        // Get or create subscription
+        $subscription = $organization->subscriptions()
+            ->where('type', 'default')
+            ->first();
+    
+        if (!$subscription) {
+            $subscription = $organization->subscriptions()->create([
+                'type' => 'default',
+                'stripe_id' => $session->subscription,
+                'stripe_status' => 'active',
+                'stripe_price' => $session->metadata->price_id ?? null,
+                'quantity' => 1,
+            ]);
+        } else {
+            $subscription->update([
+                'stripe_id' => $session->subscription,
+                'stripe_status' => 'active',
+                'stripe_price' => $session->metadata->price_id ?? null,
+                'ends_at' => null
+            ]);
+        }
+    
+        // Update organization
+        $organization->update([
+            'subscription_type' => 'paid', // Make sure this is set to paid
+            'subscription_status' => 'active'
+        ]);
+    
+        Log::info('Subscription activated', [
+            'organization_id' => $organization->id,
+            'subscription_id' => $subscription->id
+        ]);
+    }
+    
+    protected function handleOneTimePayment($session)
+    {
+        $proposalId = $session->metadata->proposal_id ?? null;
+        if ($proposalId) {
+            $proposal = Proposal::find($proposalId);
+            if ($proposal) {
+                $proposal->update(['status' => 'paid']);
+                Log::info('Proposal marked as paid', ['proposal_id' => $proposalId]);
+            }
+        }
+    }
+    
+    protected function handleInvoicePaymentSucceeded($invoice)
+    {
+        if (!$invoice->subscription) {
+            return; // Not a subscription invoice
+        }
+    
+        $subscription = Subscription::where('stripe_id', $invoice->subscription)->first();
+        if ($subscription) {
+            $organization = $subscription->organization;
+            if ($organization) {
+                $organization->update(['subscription_status' => 'active']);
+                $subscription->update(['stripe_status' => 'active', 'ends_at' => null]);
+                
+                Log::info('Subscription renewed', [
+                    'subscription_id' => $subscription->id,
+                    'organization_id' => $organization->id
+                ]);
+            }
+        }
+    }
+    
+    protected function handleSubscriptionDeleted($stripeSubscription)
+    {
+        $subscription = Subscription::where('stripe_id', $stripeSubscription->id)->first();
+        if ($subscription && $subscription->type === 'default') {
+            $subscription->update([
+                'stripe_status' => 'canceled',
+                'ends_at' => now()
+            ]);
+    
+            $organization = $subscription->organization;
+            if ($organization) {
+                $organization->update([
+                    'subscription_type' => 'free',
+                    'subscription_status' => 'active'
+                ]);
+                
+                Log::info('Subscription canceled and downgraded to free', [
+                    'organization_id' => $organization->id
+                ]);
+            }
+        }
+    }
+    
+    protected function handleSubscriptionUpdated($stripeSubscription)
+    {
+        $subscription = Subscription::where('stripe_id', $stripeSubscription->id)->first();
+        if ($subscription) {
+            if ($stripeSubscription->cancel_at_period_end) {
+                $subscription->update([
+                    'stripe_status' => 'pending_cancellation',
+                    'ends_at' => now()->setTimestamp($stripeSubscription->current_period_end)
+                ]);
+    
+                $organization = $subscription->organization;
+                if ($organization) {
+                    $organization->update([
+                        'subscription_status' => 'pending_cancellation'
+                    ]);
+                    
+                    Log::info('Subscription scheduled for cancellation', [
+                        'organization_id' => $organization->id,
+                        'ends_at' => $stripeSubscription->current_period_end
+                    ]);
+                }
+            } else if ($stripeSubscription->status === 'active') {
+                // Subscription was reactivated
+                $subscription->update([
+                    'stripe_status' => 'active',
+                    'ends_at' => null
+                ]);
+    
+                $organization = $subscription->organization;
+                if ($organization) {
+                    $organization->update([
+                        'subscription_status' => 'active'
+                    ]);
+                }
+            }
+        }
+    }
+
     protected function handleStripeWebhook(Request $request)
     {
         $payload = $request->getContent();
@@ -400,19 +560,34 @@ class PaymentController extends Controller
     {
         $sessionId = $request->get('session_id');
         
-        // Just show a success page - the webhook handles the actual processing
-        Stripe::setApiKey(config('services.stripe.secret'));
-        $session = CheckoutSession::retrieve($sessionId);
-        
-        return view('subscription.success', [
-            'sessionId' => $sessionId,
-            'isSubscription' => $session->mode === 'subscription'
-        ]);
+        if (!$sessionId) {
+            // return redirect()->route('home')->with('error', 'Invalid session');
+        }
+    
+        try {
+            Stripe::setApiKey(config('services.stripe.secret'));
+            $session = CheckoutSession::retrieve($sessionId);
+            
+            // Check if the session was successful
+            if ($session->payment_status === 'paid') {
+                return view('subscription.success', [
+                    'sessionId' => $sessionId,
+                    'isSubscription' => $session->mode === 'subscription'
+                ]);
+            } else {
+                return redirect()->route('subscription.cancel')
+                    ->with('error', 'Payment was not completed successfully');
+            }
+            
+        } catch (\Exception $e) {
+            Log::error('Subscription success error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Could not verify payment status');
+        }
     }
     
     public function subscriptionCancel()
     {
-        return view('payments.cancel');
+        return view('subscription.cancel');
     }
 
     public function downgradeSubscription(Request $request)

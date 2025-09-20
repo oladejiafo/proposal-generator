@@ -36,6 +36,12 @@ class PaymentService
             'cancel_url' => route('subscription.cancel'),
             'customer_email' => $user->email,
             'client_reference_id' => $organization->id,
+
+            'metadata' => [ // ADD THIS
+                'organization_id' => $organization->id,
+                'user_id' => $user->id,
+                'price_id' => $priceId
+            ]
         ]);
 
         return [

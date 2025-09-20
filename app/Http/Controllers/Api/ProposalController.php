@@ -29,17 +29,6 @@ use HTMLPurifier_Config;
 
 class ProposalController extends Controller
 {
-    public function indexxx(Request $request)
-    {
-        // $organizationId = session('current_organization_id');
-        $organizationId = $request->user()->organization_id;
-
-        return $request->user()->proposals()
-            ->with('client') // Eager load client
-            ->where('organization_id', $organizationId)
-            ->get();
-        // return $request->user()->proposals()->with('client')->get();
-    }
 
     public function index(Request $request)
     {
@@ -575,98 +564,6 @@ class ProposalController extends Controller
         }
     }
 
-    public function generatePdfXX(Proposal $proposal)
-    {
-        $this->authorizeProposal(request(), $proposal);
-    
-        $folderPath = storage_path('app/public/proposals');
-        if (!is_dir($folderPath)) mkdir($folderPath, 0755, true);
-    
-        $pdfPath = $folderPath . '/proposal_' . $proposal->id . '.pdf';
-        if (file_exists($pdfPath)) unlink($pdfPath);
-    
-        // Prepare signature image (Base64)
-        $signatureImage = null;
-        if (!empty($proposal->signed_data['image_path'])) {
-            $signatureFullPath = storage_path('app/public/' . $proposal->signed_data['image_path']);
-            if (file_exists($signatureFullPath)) {
-                $imageData = base64_encode(file_get_contents($signatureFullPath));
-                $mimeType = mime_content_type($signatureFullPath);
-                $signatureImage = 'data:' . $mimeType . ';base64,' . $imageData;
-            }
-        }
-    
-        // Prepare company logo (Base64)
-        $companyLogo = null;
-        $user = $proposal->user;
-        if ($user && $user->logo_path) {
-            $logoFullPath = storage_path('app/public/' . $user->logo_path);
-            if (file_exists($logoFullPath)) {
-                $imageData = base64_encode(file_get_contents($logoFullPath));
-                $mimeType = mime_content_type($logoFullPath);
-                $companyLogo = 'data:' . $mimeType . ';base64,' . $imageData;
-            }
-        }
-    
-        // Template
-        $template = $proposal->template;
-        if (!$template) return response()->json(['error' => 'No template linked'], 404);
-    
-        $templateContent = $template->content;
-        $lineItemsHtml = ProposalHelper::generateLineItemsTable($proposal);
-    
-        // Replace placeholders EXCEPT line_items
-        $placeholders = [
-            '{{client_name}}' => $proposal->client->name ?? '',
-            '{{client_company}}' => $proposal->client->company ?? '',
-            '{{project_details}}' => $proposal->project_details ?? '',
-            '{{your_name}}' => $proposal->your_name ?? '',
-            '{{your_position}}' => $proposal->your_position ?? '',
-            '{{your_contact_info}}' => $proposal->your_contact_info ?? '',
-            '{{your_company_line}}' => $proposal->your_company ? ', '.$proposal->your_company : ', Independent Consultant',
-            // leave {{line_items}} untouched for now
-        ];
-    
-        $contentWithPlaceholders = strtr($templateContent, $placeholders);
-    
-        // Use CommonMark for Markdown -> HTML
-        $converter = new CommonMarkConverter([
-            'html_input' => 'strip', // keeps raw HTML like tables untouched
-            'allow_unsafe_links' => false,
-        ]);
-    
-        // Temporarily replace line_items with a token
-        $contentWithToken = str_replace('{{line_items}}', '%%LINE_ITEMS%%', $contentWithPlaceholders);
-    
-        $htmlContent = $converter->convert($contentWithToken);
-    
-        // Put the table back
-        $htmlContent = str_replace('%%LINE_ITEMS%%', $lineItemsHtml, $htmlContent);
-    
-        // Render Blade
-        $html = view('proposals.pdf', [
-            'proposal' => $proposal,
-            'filledContent' => $htmlContent,
-            'signatureImage' => $signatureImage,
-            'companyLogo' => $companyLogo, // ← Add company logo
-        ])->render();
-    
-        // Generate PDF
-        $remoteIp = env('BROWSERSHOT_REMOTE_IP', 'local.test');
-        $remotePort = env('BROWSERSHOT_REMOTE_PORT', 9222);
-        
-        Browsershot::html($html)
-        ->setRemoteInstance($remoteIp, $remotePort)
-            ->setOption('args', ['--no-sandbox', '--disable-setuid-sandbox'])
-            ->format('A4')
-            ->save($pdfPath);
-    
-        return response()->file($pdfPath, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="proposal_' . $proposal->id . '.pdf"',
-        ]);
-    }
-    
     public function generatePdf(Proposal $proposal)
     {
         $this->authorizeProposal(request(), $proposal);

@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\OrganizationController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\AiController;
 use App\Models\Organization;
+use App\Models\PredefinedProposal;
 use Illuminate\Http\Request;
 use App\Services\UsageService;
 
@@ -15,6 +16,10 @@ use App\Http\Controllers\TeamController;
 
 
 // ==================== PUBLIC ROUTES ====================
+Route::get('/', function () {
+    return view('welcome'); // or your home page view
+})->name('home');
+
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 // Auth routes
@@ -32,13 +37,13 @@ Route::middleware('throttle:20,1')->group(function () {
 // Stripe webhook (must be public)
 Route::post('/stripe/webhook', [PaymentController::class, 'handle']);
 
-// Subscription success/cancel pages (public)
+// SUBSCRIPTION routes (organization plans)
 Route::get('/subscription/success', [PaymentController::class, 'subscriptionSuccess'])
     ->name('subscription.success');
 Route::get('/subscription/cancel', [PaymentController::class, 'subscriptionCancel'])
     ->name('subscription.cancel');
 
-// Payment success/cancel pages (public)
+// ONE-TIME PAYMENT routes (proposal payments)
 Route::get('/payments/success/{proposal}', [PaymentController::class, 'success'])
     ->name('payment.success');
 Route::get('/payments/cancel/{proposal}', [PaymentController::class, 'cancel'])
@@ -113,7 +118,10 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\CheckSubscription::class
         // Basic counts - all using the user relationship
         $clientsCount = $user->clients()->count();
         $proposalsCount = $proposalsQuery->count();
-        $templatesCount = $user->templates()->count();
+        // $templatesCount = $user->templates()->count();
+        $templatesCount = PredefinedProposal::where('user_id', $user->id)
+            ->where('is_public', false) // Count only private templates
+            ->count();
     
         // At a Glance
         $clientsThisMonth = $user->clients()
